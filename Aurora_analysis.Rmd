@@ -1,0 +1,1624 @@
+---
+title: "Aurora data analysis"
+author: "Alper"
+date: "2023-02-10"
+output: html_document
+---
+# library
+```{r message=FALSE, warning=FALSE, include=FALSE}
+source("codes/libraries_functions.R") #load the libraries
+```
+
+# table 1
+### age
+```{r}
+table_age<-gating_meta %>%
+  drop_na(age_group,ResponseGroup_Triple2) %>%
+  group_by(age_group) %>%
+  summarise(
+    Total_Samples = n(),
+    Median_Age = median(age, na.rm = TRUE),
+    Min_Age = min(age, na.rm = TRUE),
+    Max_Age = max(age, na.rm = TRUE),
+    MIA_CMV_Seropositivity_Percentage = mean(MIA_CMV_Seropositivity == "1") * 100,
+    Male_Percentage = mean(sex == "1") * 100
+  ) %>%
+  mutate(
+    Age_Range = paste0(Median_Age, " (", Min_Age, "-", Max_Age, ")"),
+    MIA_CMV_Seropositivity_Percentage = round(MIA_CMV_Seropositivity_Percentage, 0),
+    Male_Percentage = round(Male_Percentage, 0)
+  ) %>%
+  select(-Median_Age, -Min_Age, -Max_Age)
+table_age
+
+table_age_total <- gating_meta %>%
+  drop_na(age_group,ResponseGroup_Triple2) %>%
+  # group_by(age_group) %>%
+  summarise(
+    Total_Samples = n(),
+    Median_Age = median(age, na.rm = TRUE),
+    Min_Age = min(age, na.rm = TRUE),
+    Max_Age = max(age, na.rm = TRUE),
+    MIA_CMV_Seropositivity_Percentage = mean(MIA_CMV_Seropositivity == "1") * 100,
+    Male_Percentage = mean(sex == "1") * 100
+  ) %>%
+  mutate(
+    Age_Range = paste0(Median_Age, " (", Min_Age, "-", Max_Age, ")"),
+    MIA_CMV_Seropositivity_Percentage = round(MIA_CMV_Seropositivity_Percentage, 0),
+    Male_Percentage = round(Male_Percentage, 0)
+  ) %>%
+  select(-Median_Age, -Min_Age, -Max_Age)%>%
+  mutate(age_group = "all") %>%
+  select(age_group,Total_Samples,MIA_CMV_Seropositivity_Percentage,Male_Percentage,Age_Range)
+
+table_agegroups <- rbind(table_age,table_age_total)
+table_agegroups %>% write_xlsx(paste0(table_save.dir, "table_age.xlsx", sep=""))
+```
+
+### TQ
+```{r}
+table_vac<-trivac_resp_quartiles %>%
+  left_join(vital_subject) %>%
+  left_join(chronic_viral_inf) %>%
+  filter(subject_identifier %in% IDs_sub_sam$subject_identifier)  %>%
+  # drop_na(ResponseGroup_Triple2) %>%
+  group_by(ResponseGroup_Triple2) %>%
+  summarise(
+    Total_Samples = n(),
+    Median_Age = median(age, na.rm = TRUE),
+    Min_Age = min(age, na.rm = TRUE),
+    Max_Age = max(age, na.rm = TRUE),
+    MIA_CMV_Seropositivity_Percentage = mean(MIA_CMV_Seropositivity == "1") * 100,
+    Male_Percentage = mean(sex == "1") * 100
+  ) %>%
+  mutate(
+    Age_Range = paste0(Median_Age, " (", Min_Age, "-", Max_Age, ")"),
+    MIA_CMV_Seropositivity_Percentage = round(MIA_CMV_Seropositivity_Percentage, 0),
+    Male_Percentage = round(Male_Percentage, 0)
+  ) %>%
+  select(-Median_Age, -Min_Age, -Max_Age)
+
+table_vac_all<-trivac_resp_quartiles %>%
+  left_join(vital_subject) %>%
+  left_join(chronic_viral_inf) %>%
+  filter(subject_identifier %in% IDs_sub_sam$subject_identifier)  %>%
+  # drop_na(ResponseGroup_Triple2) %>%
+  # group_by(ResponseGroup_Triple2) %>%
+  summarise(
+    Total_Samples = n(),
+    Median_Age = median(age, na.rm = TRUE),
+    Min_Age = min(age, na.rm = TRUE),
+    Max_Age = max(age, na.rm = TRUE),
+    MIA_CMV_Seropositivity_Percentage = mean(MIA_CMV_Seropositivity == "1") * 100,
+    Male_Percentage = mean(sex == "1") * 100
+  ) %>%
+  mutate(
+    Age_Range = paste0(Median_Age, " (", Min_Age, "-", Max_Age, ")"),
+    MIA_CMV_Seropositivity_Percentage = round(MIA_CMV_Seropositivity_Percentage, 0),
+    Male_Percentage = round(Male_Percentage, 0)
+  ) %>%
+  mutate(ResponseGroup_Triple2 = "all") %>%
+  select(ResponseGroup_Triple2,Total_Samples,MIA_CMV_Seropositivity_Percentage,Male_Percentage,Age_Range)
+
+table_vac <- rbind(table_vac,table_vac_all)
+
+table_vac
+table_vac %>% write_xlsx(paste0(table_save.dir, "table_vac.xlsx", sep=""))
+```
+### sex difference between TQ
+```{r}
+## CMV differences between vaccine response groups
+sex_test <- trivac_resp_quartiles %>%
+  left_join(vital_subject) %>%
+  filter(subject_identifier %in% IDs_sub_sam$subject_identifier)  %>%
+  drop_na(ResponseGroup_Triple2)
+
+contingency_table <- table(sex_test$ResponseGroup_Triple2,sex_test$sex)
+contingency_table
+
+# Perform Chi-Square Test if sample size is sufficient
+chi_square_result <- chisq.test(contingency_table)
+print(chi_square_result)
+
+# If the sample size is small or if the chi-square assumptions aren't met, use Fisher's Exact Test
+fishers_exact_result <- fisher.test(contingency_table)
+print(fishers_exact_result)
+```
+### CMV difference between TQ
+```{r}
+## CMV differences between vaccine response groups
+CMV_test <- trivac_resp_quartiles %>%
+  left_join(vital_subject) %>%
+  left_join(chronic_viral_inf) %>%
+  filter(subject_identifier %in% IDs_sub_sam$subject_identifier)  %>%
+  drop_na(ResponseGroup_Triple2)
+
+contingency_table <- table(CMV_test$ResponseGroup_Triple2,CMV_test$MIA_CMV_Seropositivity)
+contingency_table
+
+# Perform Chi-Square Test if sample size is sufficient
+chi_square_result <- chisq.test(contingency_table)
+print(chi_square_result)
+
+# If the sample size is small or if the chi-square assumptions aren't met, use Fisher's Exact Test
+fishers_exact_result <- fisher.test(contingency_table)
+print(fishers_exact_result)
+```
+### age difference between TQ
+```{r}
+df_loop <- vital_subject %>%
+  full_join(trivac_resp_quartiles) %>%
+  filter(subject_identifier %in% IDs_sub_sam$subject_identifier) %>%
+  drop_na(ResponseGroup_Triple2) %>%
+  droplevels()
+Xaxis <- df_loop$ResponseGroup_Triple2
+n <- ncol(df_loop)
+Groups <- df_loop$ResponseGroup_Triple2
+Yaxis <- df_loop$age
+
+ggplot(df_loop, aes(x=Xaxis, y=Yaxis)) +
+    geom_boxplot(aes(fill=Groups), alpha=0.9,outlier.size=0,outlier.colour="white") +
+    geom_jitter(aes(fill=Groups), alpha=0.4, width = 0.3, shape=21,size=1) +
+    theme_classic()+
+    stat_summary(aes(y=Yaxis, x=Xaxis),size=0.2)
+
+
+df_loop %>%  wilcox_test(age ~ ResponseGroup_Triple2, detailed = TRUE)
+```
+
+
+# sex difference between age groups
+```{r}
+## CMV differences between vaccine response groups
+sex_test <- trivac_resp_quartiles %>%
+  left_join(vital_subject) %>%
+  filter(subject_identifier %in% IDs_sub_sam$subject_identifier)  %>%
+  drop_na(ResponseGroup_Triple2)
+
+library(rcompanion)
+
+contingency_table <- table(sex_test$age_group,sex_test$sex)
+contingency_table
+# Perform pairwise Chi-square tests with Bonferroni correction
+pairwise_results <- pairwiseNominalIndependence(contingency_table, 
+                                                fisher = TRUE, 
+                                                gtest = FALSE, 
+                                                method = "BH")
+
+pairwise_results
+```
+# CMV difference between age groups
+```{r}
+## CMV differences between vaccine response groups
+CMV_test <- trivac_resp_quartiles %>%
+  left_join(vital_subject) %>%
+  left_join(chronic_viral_inf) %>%
+  filter(subject_identifier %in% IDs_sub_sam$subject_identifier)  %>%
+  drop_na(ResponseGroup_Triple2)
+
+
+library(rcompanion)
+
+contingency_table <- table(CMV_test$age_group,CMV_test$MIA_CMV_Seropositivity)
+contingency_table
+
+# Perform pairwise Chi-square tests with Bonferroni correction
+pairwise_results <- pairwiseNominalIndependence(contingency_table, 
+                                                fisher = TRUE, 
+                                                gtest = FALSE, 
+                                                method = "BH")
+
+pairwise_results
+```
+# age difference between age groups
+```{r}
+df_stat <- SOMs_meta %>%
+  drop_na(age_group,ResponseGroup_Triple2) %>%
+  dplyr::select(subject_identifier,age_group, age) %>%
+  reshape2::melt(.)
+
+### kruskal.test and Dunn's test
+## With kruskal.test we identify overall which soms are significant and then Dunn's test tells us which are different between pairs of clusters
+kw.test.all <- df_stat %>% 
+  group_by(variable) %>% 
+  kruskal_test(value ~ age_group) %>% 
+  adjust_pvalue(method = "BH") 
+kw.test.all.eff.size <- df_stat %>% 
+  group_by(variable) %>% 
+  kruskal_effsize(value ~ age_group) 
+combine.kw <- kw.test.all %>% 
+  left_join(kw.test.all.eff.size, by="variable") %>% 
+  filter(p.adj < 0.05)
+
+## Number of variables with p.adj-value <0.05
+length(combine.kw$variable)
+
+## table summarizing effect size of the significant variables 
+table(combine.kw$magnitude)
+
+### Post-hoc analysis dunn's test, pairwise multiple comparisons to check which are significant in pairwise analysis.
+df_stat %>% 
+  group_by(variable) %>% 
+  dunn_test(value ~ age_group, p.adjust.method = "BH", detailed = TRUE) %>% select(group1, group2, p)
+```
+
+# SOM  ~ statistical tests
+## age group
+```{r}
+# all
+df_stat <- SOMs_meta %>%
+  drop_na(age_group,ResponseGroup_Triple2) %>%
+  dplyr::select(subject_identifier,age_group, contains(c("CD4","CD8","GD"))) %>%
+  reshape2::melt(.)
+
+### kruskal.test and Dunn's test
+## With kruskal.test we identify overall which soms are significant and then Dunn's test tells us which are different between pairs of clusters
+kw.test.all <- df_stat %>% 
+  group_by(variable) %>% 
+  kruskal_test(value ~ age_group) %>% 
+  adjust_pvalue(method = "BH") 
+kw.test.all.eff.size <- df_stat %>% 
+  group_by(variable) %>% 
+  kruskal_effsize(value ~ age_group) 
+combine.kw <- kw.test.all %>% 
+  left_join(kw.test.all.eff.size, by="variable") %>% 
+  filter(p.adj < 0.05)
+
+## Number of variables with p.adj-value <0.05
+length(combine.kw$variable)
+
+## table summarizing effect size of the significant variables 
+table(combine.kw$magnitude)
+
+### Post-hoc analysis dunn's test, pairwise multiple comparisons to check which are significant in pairwise analysis.
+dunn_agegroup_som <- df_stat %>% 
+  group_by(variable) %>% 
+  dunn_test(value ~ age_group, p.adjust.method = "BH", detailed = TRUE) 
+
+dunn_agegroup_som_p <- dunn_agegroup_som %>%
+  filter(p<=0.05)
+  
+dunn_agegroup_som_padj <- dunn_agegroup_som %>%
+  filter(p.adj<=0.05)
+
+
+dunn_agegroup_som_padj %>% select(variable, group1, group2, p, p.adj) %>% write_xlsx(path = paste0(table_save.dir,"SOM_agegroup.xlsx", sep=""))
+```
+## TQ
+```{r}
+df_stat <- SOMs_meta %>%
+  dplyr::select(subject_identifier,ResponseGroup_Triple2, contains(c("CD4","CD8","GD"))) %>%
+  drop_na(ResponseGroup_Triple2) %>%
+  droplevels()%>%
+  reshape2::melt(.)
+
+wilcox_TQ_som <- df_stat %>% 
+  group_by(variable) %>% 
+  wilcox_test(value ~ ResponseGroup_Triple2, detailed = TRUE) %>%
+  adjust_pvalue(method = "BH") 
+  
+wilcox_TQ_som_p <- wilcox_TQ_som %>%
+  filter(p<=0.05)
+
+wilcox_TQ_som_adj <- wilcox_TQ_som %>%
+  filter(p.adj<=0.05)
+
+wilcox_TQ_som %>%
+  select(variable, group1, group2, p, p.adj) %>% write_xlsx(path = paste0(table_save.dir,"SOM_TQ.xlsx", sep=""))
+
+```
+# TQ significant subsets ~ testing for CMV
+```{r}
+df_stat <- SOMs_meta %>%
+  dplyr::select(subject_identifier,MIA_CMV_Seropositivity,wilcox_TQ_som_p$variable) %>%
+  drop_na(MIA_CMV_Seropositivity) %>%
+  droplevels()%>%
+  reshape2::melt(.)
+
+wilcox_TQ_p_som_CMV <- df_stat %>% 
+  group_by(variable) %>% 
+  wilcox_test(value ~ MIA_CMV_Seropositivity, detailed = TRUE) %>%
+  adjust_pvalue(method = "BH") 
+
+wilcox_TQ_p_som_CMV %>% select(variable, group1, group2, p, p.adj) %>% write_xlsx(path = paste0(table_save.dir,"SOM_TQ_p_CMV.xlsx", sep=""))
+
+```
+
+# manual gating  ~ statistical tests
+## age group
+```{r}
+df_stat <- manual_gates %>%
+  left_join(vital_subject)%>%
+  drop_na(age_group) %>%
+  select(-age) %>%
+  reshape2::melt(.)
+
+### kruskal.test and Dunn's test
+## With kruskal.test we identify overall which soms are significant and then Dunn's test tells us which are different between pairs of clusters
+kw.test.all <- df_stat %>% 
+  group_by(variable) %>% 
+  kruskal_test(value ~ age_group) %>% 
+  adjust_pvalue(method = "BH") 
+kw.test.all.eff.size <- df_stat %>% 
+  group_by(variable) %>% 
+  kruskal_effsize(value ~ age_group) 
+combine.kw <- kw.test.all %>% 
+  left_join(kw.test.all.eff.size, by="variable") %>% 
+  filter(p.adj < 0.05)
+
+## Number of variables with p.adj-value <0.05
+length(combine.kw$variable)
+
+## table summarizing effect size of the significant variables 
+table(combine.kw$magnitude)
+
+### Post-hoc analysis dunn's test, pairwise multiple comparisons to check which are significant in pairwise analysis.
+dunn_agegroup_manualgating <- df_stat %>% 
+  group_by(variable) %>% 
+  dunn_test(value ~ age_group, p.adjust.method = "BH", detailed = TRUE)
+
+
+#tables ####
+dunn_agegroup_manualgating %>% filter(p<=0.05) %>% select(variable, group1, group2, p)
+
+dunn_agegroup_manualgating %>% filter(p.adj.signif %!in% "ns")
+
+dunn_agegroup_manualgating_p <- dunn_agegroup_manualgating %>% filter(p<=0.05)
+dunn_agegroup_manualgating_padj <- dunn_agegroup_manualgating %>% filter(p.adj<=0.05)
+
+
+#dunn_agegroup_manualgating %>% filter(grepl("HLADR",variable)) %>% select(variable,group1,group2,p)
+```
+## immunotype
+```{r}
+df_stat <- manual_gates %>%
+  left_join(immunotype)%>%
+  filter(cluster_number %in% c("1","6","8"))%>%
+  droplevels()%>%
+  reshape2::melt(.)
+
+### kruskal.test and Dunn's test
+## With kruskal.test we identify overall which soms are significant and then Dunn's test tells us which are different between pairs of clusters
+kw.test.all <- df_stat %>% 
+  group_by(variable) %>% 
+  kruskal_test(value ~ cluster_number) %>% 
+  adjust_pvalue(method = "BH") 
+kw.test.all.eff.size <- df_stat %>% 
+  group_by(variable) %>% 
+  kruskal_effsize(value ~ cluster_number) 
+combine.kw <- kw.test.all %>% 
+  left_join(kw.test.all.eff.size, by="variable") %>% 
+  filter(p.adj < 0.05)
+
+## Number of variables with p.adj-value <0.05
+length(combine.kw$variable)
+
+## table summarizing effect size of the significant variables 
+table(combine.kw$magnitude)
+
+### Post-hoc analysis dunn's test, pairwise multiple comparisons to check which are significant in pairwise analysis.
+dunn_cluster_manualgating <- df_stat %>% 
+  group_by(variable) %>% 
+  dunn_test(value ~ cluster_number, p.adjust.method = "BH", detailed = TRUE)
+
+
+#tables ####
+dunn_cluster_manualgating %>% filter(p<=0.05)
+
+
+dunn_cluster_manualgating_p <- dunn_cluster_manualgating %>% filter(p<=0.05)
+```
+## TQ
+```{r}
+df_stat <- manual_gates %>%
+  full_join(trivac_resp_quartiles)%>%
+  drop_na(ResponseGroup_Triple2) %>%
+  droplevels()%>%
+  reshape2::melt(.)
+
+manualgate_wilcox <- df_stat %>% 
+  group_by(variable) %>% 
+  wilcox_test(value ~ ResponseGroup_Triple2, p.adjust.method = "BH", detailed = TRUE)
+
+manualgate_wilcox_p<-manualgate_wilcox %>% filter(p <=0.05)
+```
+## CMV
+```{r}
+df_stat <- manual_gates %>%
+  full_join(chronic_viral_inf)%>%
+  full_join(trivac_resp_quartiles)%>%
+  drop_na(ResponseGroup_Triple2) %>%
+  droplevels()%>%
+  reshape2::melt(.)
+
+wilcox_manual_p_som_CMV <- df_stat %>% 
+  group_by(variable) %>% 
+  wilcox_test(value ~ MIA_CMV_Seropositivity, detailed = TRUE) %>%
+  adjust_pvalue(method = "BH") 
+
+wilcox_manual_p_som_CMV %>% select(variable, group1, group2, p, p.adj)
+
+```
+
+
+
+# MFI  ~ statistical tests
+## TQ
+```{r}
+df_stat <- MFI_meta %>%
+  full_join(trivac_resp_quartiles)%>%
+  dplyr::select(subject_identifier,ResponseGroup_Triple2, contains(c("CD4","CD8","TCRgd"))) %>%
+  drop_na(ResponseGroup_Triple2) %>%
+  droplevels()%>%
+  reshape2::melt(.)
+
+wilcox_TQ_mfi <- df_stat %>% 
+  group_by(variable) %>% 
+  wilcox_test(value ~ ResponseGroup_Triple2, detailed = TRUE) %>%
+  adjust_pvalue(method = "BH") 
+
+wilcox_TQ_mfi_p <- wilcox_TQ_mfi %>% filter(p<=0.05)
+
+wilcox_TQ_mfi_p
+
+wilcox_TQ_mfi_p %>% write_xlsx(paste0(table_save.dir, "table_MFI_TQ.xlsx", sep=""))
+```
+## stats, CD31 expression between major cell types
+```{r}
+df_stat <-MFI_celltype %>%
+  filter(subject_identifier %in% MFI_meta$subject_identifier) %>%
+  select(subject_identifier,cell_type,marker,median_expression) %>%
+  filter(marker %in% "CD31" )
+
+### kruskal.test and Dunn's test
+## With kruskal.test we identify overall which soms are significant and then Dunn's test tells us which are different between pairs of clusters
+kw.test.all <- df_stat %>% 
+  group_by(marker) %>% 
+  kruskal_test(median_expression ~ cell_type) %>% 
+  adjust_pvalue(method = "BH") 
+kw.test.all.eff.size <- df_stat %>% 
+  group_by(marker) %>% 
+  kruskal_effsize(median_expression ~ cell_type) 
+combine.kw <- kw.test.all %>% 
+  left_join(kw.test.all.eff.size, by="marker") %>% 
+  filter(p.adj < 0.05)
+
+## Number of variables with p.adj-value <0.05
+length(combine.kw$marker)
+
+## table summarizing effect size of the significant variables 
+table(combine.kw$magnitude)
+
+### Post-hoc analysis dunn's test, pairwise multiple comparisons to check which are significant in pairwise analysis.
+df_stat %>% 
+  group_by(marker) %>% 
+  dunn_test(median_expression ~ cell_type, p.adjust.method = "BH", detailed = TRUE) %>%
+  select(marker,group1,group2,p,p.adj)
+
+```
+
+# PCA
+## age group
+### data organization
+```{r eval=FALSE, include=FALSE}
+library(FactoMineR)
+library(factoextra)
+
+# pca_2_subject <- SOMs_meta %>%
+#   dplyr::select(subject_identifier, age, sex, age_group, cluster_number, sex, MIA_CMV_Seropositivity) %>%
+#   as.data.frame()
+
+pca_2_subject <- SOMs_meta %>%
+  drop_na(ResponseGroup_Triple2)%>%
+  dplyr::select(subject_identifier, age, sex, ResponseGroup_Triple2, age_group, cluster_number, sex, MIA_CMV_Seropositivity) %>%
+  as.data.frame() %>%
+  mutate(cluster_number = ifelse(cluster_number %in% c(1, 6, 8), cluster_number, NA))
+
+varsPCA<-dunn_agegroup_som_padj %>% select(variable) %>% droplevels() %>% pull()
+
+
+pca_2_imm <- SOMs_meta %>%
+  drop_na(ResponseGroup_Triple2)%>%
+  dplyr::select(subject_identifier, contains(c("CD4","CD8","GD"))) %>%
+  dplyr::select(subject_identifier,varsPCA) %>%
+  as.data.frame()
+  
+
+pca_2_imm[-1] <- scale(pca_2_imm[-1]) %>% as.data.frame()
+
+all.equal(pca_2_subject$sample_identifier,pca_2_imm$sample_identifier)
+
+pca_2_subject <- pca_2_subject %>%
+  column_to_rownames(var = "subject_identifier")
+pca_2_imm <- pca_2_imm %>%
+  column_to_rownames(var = "subject_identifier")
+
+```
+### generate PCA plots
+```{r eval=FALSE, include=FALSE}
+## run PCA
+res.pca <- PCA(pca_2_imm, graph = TRUE) #dat is scaled
+
+## extract eigen values
+eig.val <- get_eigenvalue(res.pca)
+
+## Screeplot visualise eigen values
+PCA_screeplot <- fviz_eig(res.pca, addlabels = TRUE, ylim = c(0, 25))
+pdf(file = paste0(PCA_save.dir, "SOM_PCA_agegroupscreeplot.pdf", sep=""), width =6 , height =5) ; PCA_screeplot ; dev.off()
+
+## Extract the results for individuals only
+var <- get_pca_var(res.pca)
+head(var$coord) #coordinates
+head(var$cos2) #Cos2: quality on the factore map
+head(var$contrib) #Contributions to the principal components
+
+x1 <-var$contrib
+x2 <-var$cos2
+
+## Extract the results for variables only
+ind <- get_pca_ind(res.pca)
+# head(ind$coord) #coordinates
+# head(ind$cos2) #Cos2: quality on the factore map
+# head(ind$contrib) #Contributions to the principal components
+
+
+## Visualization of PCA plot with geom density
+pca_geomdens <- fviz_pca_ind(res.pca,
+                             geom.ind = "point", # show points only (but not "text")
+                             legend.title = "PCA density") +
+geom_density_2d()
+
+## save
+pdf(file = paste0(PCA_save.dir, "SOM_PCA_agegroupdensity.pdf", sep=""), width =5 , height =5) ; pca_geomdens ; dev.off()
+
+## Visualization of top 10 parameters,  cos2
+PCA_variable_cos2_topx <- fviz_pca_var(res.pca,
+                                       col.var = "cos2",
+                                       gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+                                       repel=TRUE,
+                                       title ="",
+                                       select.var = list(name = NULL, cos2 = 10, contrib = NULL))+theme_classic()
+## save
+pdf(file = paste0(PCA_save.dir, "SOM_PCA_agegroupvariable_cos2_topx.pdf", sep=""), width =6 , height =6) ; PCA_variable_cos2_topx ; dev.off()
+
+
+## Visualization of cos2 all
+PCA_variable_cos2 <- fviz_pca_var(res.pca,
+                                  col.var = "cos2",
+                                  gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+                                  repel=TRUE,
+                                  alpha.var = "cos2",
+                                  title ="cos2 to PCs")+theme_classic()
+## save
+pdf(file = paste0(PCA_save.dir, "SOM_PCA_agegroupvariable_cos2.pdf", sep=""), width =10 , height =10) ; PCA_variable_cos2 ; dev.off()
+
+## immunotype
+pdf(file = paste0(PCA_save.dir,"SOM_PCA_agegroupimmunotype168.pdf", sep=""), width =6 , height =5)
+fviz_pca_ind(res.pca,
+             geom.ind = "point", # show points only (but not "text")
+             habillage = as.factor(pca_2_subject$cluster_number),
+             palette = c("#77AADD","#EEDD88","#FFAABB","#DDDDDD"),
+             ellipse.type = c("t"),
+             addEllipses = TRUE,
+             pointsize = 0.9,
+             alpha.ind = 1
+             )+
+  theme_classic()
+dev.off()
+
+## immunotype
+pdf(file = paste0(PCA_save.dir,"SOM_PCA_agegroupresponse.pdf", sep=""), width =6 , height =5)
+fviz_pca_ind(res.pca,
+             geom.ind = "point", # show points only (but not "text")
+             habillage = as.factor(pca_2_subject$ResponseGroup_Triple2),
+             palette = c("#D41159","#1A85FF"),
+             ellipse.type = c("t"),
+             addEllipses = TRUE,
+             pointsize = 0.9,
+             alpha.ind = 1
+             )+
+  theme_classic()
+dev.off()
+
+## age group
+pdf(file = paste0(PCA_save.dir,"SOM_PCA_agegroupagegroup.pdf", sep=""), width =6 , height =5)
+fviz_pca_ind(res.pca,
+             geom.ind = "point", # show points only (but not "text")
+             habillage = as.factor(pca_2_subject$age_group),
+             palette = c("#F0E442","#85C0F9","#F5793A"),
+             ellipse.type = c("t"),
+             addEllipses = TRUE,
+             pointsize = 0.9,
+             alpha.ind = 1
+             )+
+  theme_classic()
+dev.off()
+
+## location of individuals
+pdf(file = paste0(PCA_save.dir,"SOM_PCA_agegroupindividuals.pdf", sep=""), width =7 , height =7)
+fviz_pca_ind(res.pca,
+             geom.ind = "text", # show points only (but not "text")
+             gradient.cols = heat.colors(60),
+             legend.title = "")
+dev.off()
+
+```
+## TQ
+### data organization
+```{r eval=FALSE, include=FALSE}
+library(FactoMineR)
+library(factoextra)
+
+# pca_2_subject <- SOMs_meta %>%
+#   dplyr::select(subject_identifier, age, sex, age_group, cluster_number, sex, MIA_CMV_Seropositivity) %>%
+#   as.data.frame()
+
+varsPCA<-wilcox_TQ_som_p %>% select(variable) %>% droplevels() %>% pull()
+
+pca_2_imm <- SOMs_meta %>%
+  drop_na(ResponseGroup_Triple2)%>%
+  dplyr::select(subject_identifier, contains(c("CD4","CD8","GD"))) %>%
+  dplyr::select(subject_identifier,varsPCA) %>%
+  as.data.frame() 
+  
+
+pca_2_subject <- SOMs_meta %>%
+  drop_na(ResponseGroup_Triple2)%>%
+  dplyr::select(subject_identifier, age, sex, ResponseGroup_Triple2, age_group, cluster_number, sex, MIA_CMV_Seropositivity) %>%
+  as.data.frame() %>%
+  filter(subject_identifier %in% pca_2_imm$subject_identifier)
+
+
+pca_2_imm[-1] <- scale(pca_2_imm[-1]) %>% as.data.frame()
+
+all.equal(pca_2_subject$sample_identifier,pca_2_imm$sample_identifier)
+
+pca_2_subject <- pca_2_subject %>%
+  column_to_rownames(var = "subject_identifier")
+pca_2_imm <- pca_2_imm %>%
+  column_to_rownames(var = "subject_identifier")
+
+```
+### generate PCA plots
+```{r eval=FALSE, include=FALSE}
+## run PCA
+res.pca <- PCA(pca_2_imm, graph = TRUE) #dat is scaled
+
+## extract eigen values
+eig.val <- get_eigenvalue(res.pca)
+
+## Screeplot visualise eigen values
+PCA_screeplot <- fviz_eig(res.pca, addlabels = TRUE, ylim = c(0, 25))
+pdf(file = paste0(PCA_save.dir, "SOM_PCA_TQscreeplot.pdf", sep=""), width =6 , height =5) ; PCA_screeplot ; dev.off()
+
+## Extract the results for individuals only
+var <- get_pca_var(res.pca)
+head(var$coord) #coordinates
+head(var$cos2) #Cos2: quality on the factore map
+head(var$contrib) #Contributions to the principal components
+
+x1 <-var$contrib
+x2 <-var$cos2
+
+## Extract the results for variables only
+ind <- get_pca_ind(res.pca)
+# head(ind$coord) #coordinates
+# head(ind$cos2) #Cos2: quality on the factore map
+# head(ind$contrib) #Contributions to the principal components
+
+
+## Visualization of PCA plot with geom density
+pca_geomdens <- fviz_pca_ind(res.pca,
+                             geom.ind = "point", # show points only (but not "text")
+                             legend.title = "PCA density") +
+geom_density_2d()
+
+## save
+pdf(file = paste0(PCA_save.dir, "SOM_PCA_TQdensity.pdf", sep=""), width =5 , height =5) ; pca_geomdens ; dev.off()
+
+## Visualization of top 10 parameters,  cos2
+PCA_variable_cos2_topx <- fviz_pca_var(res.pca,
+                                       col.var = "cos2",
+                                       gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+                                       repel=TRUE,
+                                       title ="",
+                                       select.var = list(name = NULL, cos2 = 10, contrib = NULL))+theme_classic()
+## save
+pdf(file = paste0(PCA_save.dir, "SOM_PCA_TQvariable_cos2_topx.pdf", sep=""), width =5 , height =4) ; PCA_variable_cos2_topx ; dev.off()
+
+
+## Visualization of cos2 all
+PCA_variable_cos2 <- fviz_pca_var(res.pca,
+                                  col.var = "cos2",
+                                  gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+                                  repel=TRUE,
+                                  alpha.var = "cos2",
+                                  title ="cos2 to PCs")+theme_classic()
+## save
+pdf(file = paste0(PCA_save.dir, "SOM_PCA_TQvariable_cos2.pdf", sep=""), width =10 , height =10) ; PCA_variable_cos2 ; dev.off()
+
+# ## immunotype
+# pdf(file = paste0(PCA_save.dir,"SOM_PCA_immunotype168.pdf", sep=""), width =6 , height =5)
+# fviz_pca_ind(res.pca,
+#              geom.ind = "point", # show points only (but not "text")
+#              habillage = as.factor(pca_2_subject$cluster_number),
+#              palette = c("#77AADD","#EEDD88","#FFAABB","#DDDDDD"),
+#              ellipse.type = c("t"),
+#              addEllipses = TRUE,
+#              pointsize = 0.9,
+#              alpha.ind = 1
+#              )+
+#   theme_classic()
+# dev.off()
+
+## immunotype
+pdf(file = paste0(PCA_save.dir,"SOM_PCA_TQresponse.pdf", sep=""), width =5 , height =4)
+fviz_pca_ind(res.pca,
+             geom.ind = "point", # show points only (but not "text")
+             habillage = as.factor(pca_2_subject$ResponseGroup_Triple2),
+             palette = c("#D41159","#1A85FF"),
+             ellipse.type = c("t"),
+             addEllipses = TRUE,
+             pointsize = 0.9,
+             alpha.ind = 1
+             )+
+  theme_classic()
+dev.off()
+
+
+## age group
+pdf(file = paste0(PCA_save.dir,"SOM_PCA_TQagegroup.pdf", sep=""), width =6 , height =5)
+fviz_pca_ind(res.pca,
+             geom.ind = "point", # show points only (but not "text")
+             habillage = as.factor(pca_2_subject$age_group),
+             palette = c("#F0E442","#85C0F9","#F5793A"),
+             ellipse.type = c("t"),
+             addEllipses = TRUE,
+             pointsize = 0.9,
+             alpha.ind = 1
+             )+
+  theme_classic()
+dev.off()
+
+## location of individuals
+pdf(file = paste0(PCA_save.dir,"SOM_PCA_TQindividuals.pdf", sep=""), width =7 , height =7)
+fviz_pca_ind(res.pca,
+             geom.ind = "text", # show points only (but not "text")
+             gradient.cols = heat.colors(60),
+             legend.title = "")
+dev.off()
+
+```
+# plots SOM som  
+## TQ
+```{r}
+## saving figures
+df_loop <- SOMs_meta %>%
+  dplyr::select(ResponseGroup_Triple2, contains(c("CD4","CD8","GD"))) %>%
+  drop_na(ResponseGroup_Triple2) %>%
+  droplevels()
+Xaxis <- df_loop$ResponseGroup_Triple2
+n <- ncol(df_loop)
+Groups <- df_loop$ResponseGroup_Triple2
+
+## linear axis loop
+for (i in c(2:ncol(df_loop))){ #select the column data starts 
+  Yaxis <- df_loop[[i]]
+  y_title <- colnames(df_loop[i])
+  p <- boxplot_agegroup()+labs(title="",x="ResponseGroup_Triple2",y = y_title)+
+    theme(legend.position = "none")+
+    scale_fill_manual("Vaccine response", values=c("#D41159","#1A85FF"))
+
+  pdf(file = paste0(som_TQ_save.dir, paste("TQ_", y_title, "_linear.pdf", sep = ""), sep="") ,width = 2 , height = 2)
+  print(p)
+  dev.off()
+}
+```
+## age group 
+```{r}
+## saving figures
+df_loop <- SOMs_meta %>%
+  dplyr::select(age_group, contains(c("CD4","CD8","GD"))) %>%
+  drop_na(age_group) %>% droplevels()
+Xaxis <- df_loop$age_group
+n <- ncol(df_loop)
+Groups <- df_loop$age_group
+
+## linear axis loop
+for (i in c(2:ncol(df_loop))){ #select the column data starts 
+  Yaxis <- df_loop[[i]]
+  y_title <- colnames(df_loop[i])
+  p <- boxplot_agegroup()+labs(title="",x="age_group",y = y_title)+theme(legend.position = "none")
+  pdf(file = paste0(som_agegroup_save.dir, paste("age_group_", y_title, "_linear.pdf", sep = ""), sep="") ,width = 2 , height = 2)
+  print(p)
+  dev.off()
+}
+
+
+ggplot(SOMs_meta, aes(x=age_group, y=GDc17)) +
+    geom_boxplot(aes(fill=age_group), alpha=0.9,outlier.size=0,outlier.colour="white") +
+    geom_jitter(aes(fill=age_group), alpha=0.4, width = 0.3, shape=21,size=1) +
+    scale_fill_manual("Age group", values=cols_agegroup) +
+    theme_classic()+
+    stat_summary(aes(y=GDc17, x=age_group),size=0.2)+ scale_y_log10()
+```
+## CMV
+```{r}
+## saving figures
+df_loop <- SOMs_meta %>%
+  dplyr::select(MIA_CMV_Seropositivity, contains(c("CD4","CD8","GD"))) %>%
+  droplevels()%>%
+  mutate(MIA_CMV_Seropositivity = recode(MIA_CMV_Seropositivity,
+                                         "1" = "CMV(+)",
+                                         "2" = "CMV(-)")) 
+Xaxis <- df_loop$MIA_CMV_Seropositivity
+n <- ncol(df_loop)
+Groups <- df_loop$MIA_CMV_Seropositivity
+
+## linear axis loop
+for (i in c(2:ncol(df_loop))){ #select the column data starts 
+  Yaxis <- df_loop[[i]]
+  y_title <- colnames(df_loop[i])
+  p <- boxplot_agegroup()+labs(title="",x="",y = y_title)+
+    theme(legend.position = "none")+
+    scale_fill_manual("MIA_CMV_Seropositivity", values=c("#5D3A9B","#E66100"))
+
+  pdf(file = paste0(som_CMV_save.dir, paste("CMV_", y_title, "_linear.pdf", sep = ""), sep="") ,width = 2 , height = 2)
+  print(p)
+  dev.off()
+}
+```
+## age group facet CMV
+```{r}
+## saving figures
+df_loop <- SOMs_meta%>%
+  drop_na(age_group)%>%
+  droplevels() %>%
+  mutate(MIA_CMV_Seropositivity = recode(MIA_CMV_Seropositivity,
+                                         "1" = "CMV(+)",
+                                         "2" = "CMV(-)")) 
+
+Xaxis <- df_loop$MIA_CMV_Seropositivity
+n <- ncol(df_loop)
+Groups <- df_loop$MIA_CMV_Seropositivity
+
+## linear axis loop
+for (i in c(14:ncol(df_loop))){ #select the column data starts 
+  Yaxis <- df_loop[[i]]
+  y_title <- colnames(df_loop[i])
+  p <- boxplot_agegroup()+labs(title="",x="",y = y_title)+
+    scale_fill_manual("CMV seropositivity",  values=c("#5D3A9B","#E66100")) +
+    theme(legend.position = "none")+
+    facet_wrap(~age_group)
+  pdf(file = paste0(som_agegroup_save.dir, paste("CMV_age_group_", y_title, "_linear.pdf", sep = ""), sep="") ,width = 4 , height = 2)
+  print(p)
+  dev.off()
+}
+
+```
+
+# plots manual gating  
+## response group
+```{r}
+## saving figures
+df_loop <- gating_meta %>%
+  dplyr::select(ResponseGroup_Triple2, contains(c("CD4","CD8","TCRgd"))) %>%
+  drop_na(ResponseGroup_Triple2) %>%
+  droplevels()
+Xaxis <- df_loop$ResponseGroup_Triple2
+n <- ncol(df_loop)
+Groups <- df_loop$ResponseGroup_Triple2
+
+## linear axis loop
+for (i in c(2:ncol(df_loop))){ #select the column data starts 
+  Yaxis <- df_loop[[i]]
+  y_title <- colnames(df_loop[i])
+  p <- boxplot_agegroup()+labs(title="",x="ResponseGroup_Triple2",y = y_title)+
+    theme(legend.position = "none")+
+    scale_fill_manual("Vaccine response", values=c("#D41159","#1A85FF"))
+
+  pdf(file = paste0(manual_TQ_save.dir, paste("TQ_", y_title, "_linear.pdf", sep = ""), sep="") ,width = 2 , height = 2)
+  print(p)
+  dev.off()
+}
+```
+## age group
+```{r}
+## saving figures
+df_loop <- gating_meta%>%
+  drop_na(age_group)%>%
+  droplevels()
+Xaxis <- df_loop$age_group
+n <- ncol(df_loop)
+Groups <- df_loop$age_group
+
+## linear axis loop
+for (i in c(12:ncol(df_loop))){ #select the column data starts 
+  Yaxis <- df_loop[[i]]
+  y_title <- colnames(df_loop[i])
+  p <- boxplot_agegroup()+labs(title="",x="age_group",y = y_title)+theme(legend.position = "none")
+  pdf(file = paste0(manual_agegroup_save.dir, paste("age_group_", y_title, "_linear.pdf", sep = ""), sep="") ,width = 2 , height = 2)
+  print(p)
+  dev.off()
+}
+```
+## age group facet CMV
+```{r}
+## saving figures
+df_loop <- gating_meta%>%
+  drop_na(age_group)%>%
+  droplevels() %>%
+  mutate(MIA_CMV_Seropositivity = recode(MIA_CMV_Seropositivity,
+                                         "1" = "CMV(+)",
+                                         "2" = "CMV(-)")) 
+
+Xaxis <- df_loop$MIA_CMV_Seropositivity
+n <- ncol(df_loop)
+Groups <- df_loop$MIA_CMV_Seropositivity
+
+## linear axis loop
+for (i in c(9:ncol(df_loop))){ #select the column data starts 
+  Yaxis <- df_loop[[i]]
+  y_title <- colnames(df_loop[i])
+  p <- boxplot_agegroup()+labs(title="",x="",y = y_title)+
+    scale_fill_manual("CMV seropositivity", values=c("#5D3A9B","#E66100")) +
+    theme(legend.position = "none")+
+    facet_wrap(~age_group)
+  pdf(file = paste0(manual_agegroup_save.dir, paste("CMV_age_group_", y_title, "_linear.pdf", sep = ""), sep="") ,width = 4 , height = 2.5)
+  print(p)
+  dev.off()
+}
+
+
+```
+## HLADR CD4+ Tcm Tem Tn Temra
+```{r}
+## saving figures
+df_loop <- gating_meta%>%
+  drop_na(age_group)%>%
+  droplevels() %>%
+  mutate(age_group2 = "all") %>% 
+  select(subject_identifier, `CD4_HLADR+_Tn_per`,`CD4_HLADR+_Tcm_per`,`CD4_HLADR+_Tem_per`,`CD4_HLADR+_Temra_per`) %>%
+  rename("Tn"="CD4_HLADR+_Tn_per",
+         "Tcm"="CD4_HLADR+_Tcm_per",
+         "Tem"="CD4_HLADR+_Tem_per",
+         "Temra"="CD4_HLADR+_Temra_per")%>%
+  reshape2::melt(.)
+
+ggplot(df_loop, aes(x=variable, y=value)) +
+  geom_boxplot(aes(fill=variable), alpha=0.9,outlier.size=0,outlier.colour="white") +
+  geom_jitter(aes(fill=variable), alpha=0.4, width = 0.3, shape=21,size=1) +
+  theme_classic()+
+  stat_summary(aes(y=value, x=variable),size=0.2)+
+  theme(legend.position = "none")+xlab("")+ylab("% within HLA-DR+ CD4+ T cells")
+ggsave(file = paste0(manual_agegroup_save.dir, "fig_HLADRCD4_mem", i, "_linear.pdf"), width = 2.5, height = 1.5)
+
+```
+## HLADR CD8+ Tcm Tem Tn Temra
+```{r}
+## saving figures
+df_loop <- gating_meta%>%
+  drop_na(age_group)%>%
+  droplevels() %>%
+  mutate(age_group2 = "all") %>% 
+  select(subject_identifier, `CD8_HLADR+_Tn_per`,`CD8_HLADR+_Tcm_per`,`CD8_HLADR+_Tem_per`,`CD8_HLADR+_Temra_per`) %>%
+  rename("Tn"="CD8_HLADR+_Tn_per",
+         "Tcm"="CD8_HLADR+_Tcm_per",
+         "Tem"="CD8_HLADR+_Tem_per",
+         "Temra"="CD8_HLADR+_Temra_per")%>%
+  reshape2::melt(.)
+
+ggplot(df_loop, aes(x=variable, y=value)) +
+  geom_boxplot(aes(fill=variable), alpha=0.9,outlier.size=0,outlier.colour="white") +
+  geom_jitter(aes(fill=variable), alpha=0.4, width = 0.3, shape=21,size=1) +
+  theme_classic()+
+  stat_summary(aes(y=value, x=variable),size=0.2)+
+  theme(legend.position = "none")+xlab("")+ylab("% within HLA-DR+ CD8+ T cells")
+ggsave(file = paste0(manual_agegroup_save.dir, "fig_HLADRCD8_mem", i, "_linear.pdf"), width = 2.5, height = 1.5)
+
+```
+
+## CMV
+```{r}
+## saving figures
+df_loop <- gating_meta %>%
+  dplyr::select(MIA_CMV_Seropositivity, contains(c("CD4","CD8","TCRgd"))) %>%
+  droplevels() %>%
+  mutate(MIA_CMV_Seropositivity = recode(MIA_CMV_Seropositivity,
+                                         "1" = "CMV(+)",
+                                         "2" = "CMV(-)")) 
+Xaxis <- df_loop$MIA_CMV_Seropositivity
+n <- ncol(df_loop)
+Groups <- df_loop$MIA_CMV_Seropositivity
+
+## linear axis loop
+for (i in c(2:ncol(df_loop))){ #select the column data starts 
+  Yaxis <- df_loop[[i]]
+  y_title <- colnames(df_loop[i])
+  p <- boxplot_agegroup()+labs(title="",x="",y = y_title)+
+    theme(legend.position = "none")+
+    scale_fill_manual("MIA_CMV_Seropositivity", values=c("#5D3A9B","#E66100"))
+
+  pdf(file = paste0(manual_CMV_save.dir, paste("CMV_", y_title, "_linear.pdf", sep = ""), sep="") ,width = 2 , height = 2)
+  print(p)
+  dev.off()
+}
+
+```
+## CD31+ CD4 and CD8 naive T cells, age group and total
+```{r}
+df_loop <- gating_meta%>%
+  drop_na(age_group)%>%
+  droplevels() %>%
+  mutate(age_group2 = "all")
+
+
+## CD4 
+Yaxis <- df_loop$`CD4_CD31+_TrueN_per`
+y_title <-"CD4_CD31+_TrueN_per"
+
+p1 <-ggplot(df_loop, aes(x=age_group, y=Yaxis)) +
+  geom_boxplot(aes(fill=age_group), alpha=0.9,outlier.size=0,outlier.colour="white") +
+  geom_jitter(aes(fill=age_group), alpha=0.4, width = 0.3, shape=21,size=1) +
+  scale_fill_manual("Age group", values=cols_agegroup) +
+  theme_classic()+
+  stat_summary(aes(y=Yaxis, x=age_group),size=0.2)+
+  theme(legend.position = "none")+
+  ylab("CD4_CD31+_TrueN_per")
+
+
+p2 <- ggplot(df_loop, aes(x=age_group2, y=Yaxis)) +
+  geom_boxplot(aes(fill=age_group2), alpha=0.9,outlier.size=0,outlier.colour="white") +
+  geom_jitter(aes(fill=age_group2), alpha=0.4, width = 0.3, shape=21,size=1) +
+  theme_classic()+
+  scale_fill_manual(values="grey") +
+  scale_color_manual(values="grey") +
+  stat_summary(aes(y=Yaxis, x=age_group2),size=0.2)+
+  theme(legend.position = "none")+
+  ylab("CD4_CD31+_TrueN_per")
+
+ggarrange(p2,p1, widths = c(1,2))
+ggsave(file = paste0(manual_agegroup_save.dir, "fig_CD4+CD31+naiveT_agegroupal.pdf", sep=""), width =3 , height =2)
+
+## CD8
+Yaxis <- df_loop$`CD8_CD31+_TrueN_per`
+y_title <-"CD8_CD31+_TrueN_per"
+
+p1 <-ggplot(df_loop, aes(x=age_group, y=Yaxis)) +
+  geom_boxplot(aes(fill=age_group), alpha=0.9,outlier.size=0,outlier.colour="white") +
+  geom_jitter(aes(fill=age_group), alpha=0.4, width = 0.3, shape=21,size=1) +
+  scale_fill_manual("Age group", values=cols_agegroup) +
+  theme_classic()+
+  stat_summary(aes(y=Yaxis, x=age_group),size=0.2)+
+  theme(legend.position = "none")+
+  ylab("CD8_CD31+_TrueN_per")
+
+
+p2 <- ggplot(df_loop, aes(x=age_group2, y=Yaxis)) +
+  geom_boxplot(aes(fill=age_group2), alpha=0.9,outlier.size=0,outlier.colour="white") +
+  geom_jitter(aes(fill=age_group2), alpha=0.4, width = 0.3, shape=21,size=1) +
+  theme_classic()+
+  scale_fill_manual(values="grey") +
+  scale_color_manual(values="grey") +
+  stat_summary(aes(y=Yaxis, x=age_group2),size=0.2)+
+  theme(legend.position = "none")+
+  ylab("CD8_CD31+_TrueN_per")
+
+
+ggarrange(p2,p1, widths = c(1,2))
+ggsave(file = paste0(manual_agegroup_save.dir, "fig_CD8+CD31+naiveT_agegroupal.pdf", sep=""), width =3 , height =2)
+```
+
+# plots MFI
+## between major cell types
+```{r}
+CD31_celltype <- MFI_celltype %>% 
+  filter(subject_identifier %in% SOMs_meta$subject_identifier) %>%
+  filter(marker %in% "CD31") %>%
+  ggplot(aes(x=cell_type, y=median_expression)) +
+  geom_boxplot(aes(fill=cell_type), alpha=0.9,outlier.size=0,outlier.colour="white") +
+  geom_jitter(aes(fill=cell_type), alpha=0.4, width = 0.3, shape=21,size=1) +
+  stat_summary(aes(y=median_expression, x=cell_type),size=0.2)+
+  theme_pubr()+
+  xlab("cell type")+
+  ylab("CD31 (MFI)")+
+  theme(legend.position = "none")+
+  scale_fill_manual(values=c("#0072B2","#D55E00","#CC79A7"))+
+  scale_fill_manual(values=c("#0072B2","#D55E00","#CC79A7"))
+
+CD31_celltype
+ggsave(file = paste0(MFI_save.dir, "CD31_celltype.pdf", sep=""), width =2.5 , height =2)
+
+```
+## response group
+```{r}
+## saving figures
+df_loop <- MFI_meta %>%
+  dplyr::select(ResponseGroup_Triple2, contains(c("CD4","CD8","TCRgd"))) %>%
+  drop_na(ResponseGroup_Triple2) %>%
+  droplevels()
+Xaxis <- df_loop$ResponseGroup_Triple2
+n <- ncol(df_loop)
+Groups <- df_loop$ResponseGroup_Triple2
+
+## linear axis loop
+for (i in c(2:ncol(df_loop))){ #select the column data starts 
+  Yaxis <- df_loop[[i]]
+  y_title <- colnames(df_loop[i])
+  p <- boxplot_agegroup()+labs(title="",x="ResponseGroup_Triple2",y = y_title)+
+    theme(legend.position = "none")+
+    scale_fill_manual("Vaccine response", values=c("#D41159","#1A85FF"))
+
+  pdf(file = paste0(MFI_TQ_save.dir, paste("TQ_", y_title, "_linear.pdf", sep = ""), sep="") ,width = 2 , height = 2)
+  print(p)
+  dev.off()
+}
+```
+## CMV
+```{r}
+## saving figures
+df_loop <- df_loop <- MFI_meta %>%
+  dplyr::select(age_group,MIA_CMV_Seropositivity, contains(c("CD4","CD8","GD"))) %>%
+  mutate(MIA_CMV_Seropositivity = recode(MIA_CMV_Seropositivity,
+                                         "1" = "CMV(+)",
+                                         "2" = "CMV(-)"))%>%
+  droplevels()
+
+Xaxis <- df_loop$MIA_CMV_Seropositivity
+n <- ncol(df_loop)
+Groups <- df_loop$MIA_CMV_Seropositivity
+
+## linear axis loop
+for (i in c(3:ncol(df_loop))){ #select the column data starts 
+  Yaxis <- df_loop[[i]]
+  y_title <- colnames(df_loop[i])
+  p <- boxplot_agegroup()+labs(title="",x="",y = y_title)+
+    theme(legend.position = "none")+
+    scale_fill_manual("MIA_CMV_Seropositivity", values=c("#5D3A9B","#E66100"))
+
+  pdf(file = paste0(MFI_CMV_save.dir, paste("CMV_", y_title, "_linear.pdf", sep = ""), sep="") ,width = 2 , height = 2)
+  print(p)
+  dev.off()
+}
+
+
+## linear axis loop
+for (i in c(3:ncol(df_loop))){ #select the column data starts 
+  Yaxis <- df_loop[[i]]
+  y_title <- colnames(df_loop[i])
+  p <- boxplot_agegroup()+labs(title="",x="",y = y_title)+
+    theme(legend.position = "none")+
+    scale_fill_manual("MIA_CMV_Seropositivity", values=c("#5D3A9B","#E66100"))+
+    facet_wrap(.~age_group)
+
+  pdf(file = paste0(MFI_CMV_save.dir, paste("CMV_agegroup_", y_title, "_linear.pdf", sep = ""), sep="") ,width = 4 , height = 2)
+  print(p)
+  dev.off()
+}
+```
+
+
+
+
+## TQ ~ entropy
+```{r}
+df_loop <- trivac_resp_quartiles %>%
+  left_join(immune_entropy) %>% 
+  filter(subject_identifier %in% IDs_sub_sam$subject_identifier) 
+
+
+
+Xaxis <- df_loop$ResponseGroup_Triple2
+n <- ncol(df_loop)
+Groups <- df_loop$ResponseGroup_Triple2
+Yaxis <- df_loop$immune_entropy
+
+
+boxplot_agegroup()+labs(title="",x="ResponseGroup_Triple2",y = y_title)+
+    theme(legend.position = "none")+
+    scale_fill_manual("Vaccine response", values=c("#D41159","#1A85FF"))
+```
+
+# correlations SOM - entropy - age
+```{r}
+cor_df1 <- SOMs_meta %>%
+  select(immune_entropy,age,wilcox_TQ_som_p$variable) 
+
+names(cor_df1) <- gsub(x = names(cor_df1), pattern = "\\+", replacement = "p")
+names(cor_df1) <- gsub(x = names(cor_df1), pattern = "\\-", replacement = "p")
+
+cor_df_TQ<- cor_df1 %>%
+  rstatix::cor_test(method = "spearman") %>%
+  filter(var1!=var2) 
+
+
+entropy_cor <- cor_df_TQ %>%
+  filter(var1 %in% "immune_entropy") %>%
+  arrange(desc(abs(cor)))
+
+age_cor <- cor_df_TQ %>%
+  filter(var1 %in% "age") %>%
+  arrange(desc(abs(cor)))
+
+cor_table_som <- rbind(entropy_cor, age_cor) %>%
+  arrange(desc(var2)) %>%
+  select(-c(statistic,method)) %>%
+  select(var2,var1,cor,p) %>%
+  filter(var2 %!in% "age")  %>%
+  adjust_pvalue(method="BH")
+
+cor_table_som %>% filter(var1 %in% "immune_entropy") %>% filter(p.adj<0.05)
+
+cor_table_som %>% write_xlsx(paste0(table_save.dir, "table_cor_som.xlsx", sep=""))
+
+```
+
+# correlations MFI - entropy - age
+```{r}
+cor_df1 <- MFI_meta %>%
+  select(immune_entropy,age, contains(c("CD4","CD8","GD"))) 
+
+names(cor_df1) <- gsub(x = names(cor_df1), pattern = "\\+", replacement = "p")
+names(cor_df1) <- gsub(x = names(cor_df1), pattern = "\\-", replacement = "p")
+
+cor_df_MFI<- cor_df1 %>%
+  rstatix::cor_test(method = "spearman") %>%
+  filter(var1!=var2) 
+
+
+entropy_cor <- cor_df_MFI %>%
+  filter(var1 %in% "immune_entropy") %>%
+  arrange(desc(abs(cor)))
+
+age_cor <- cor_df_MFI %>%
+  filter(var1 %in% "age") %>%
+  arrange(desc(abs(cor)))
+
+cor_table_MFI <- rbind(entropy_cor, age_cor) %>%
+  arrange(desc(var2)) %>%
+  select(-c(statistic,method)) %>%
+  select(var2,var1,cor,p) %>%
+  filter(var2 %!in% "age")  %>%
+  adjust_pvalue(method="BH")
+
+cor_table_MFI %>% filter(p<0.05) %>% filter(var1 %in% "immune_entropy")
+
+cor_table_MFI %>% write_xlsx(paste0(table_save.dir, "table_cor_mfi.xlsx", sep=""))
+
+```
+# plot som correlation
+## CD4c23
+```{r}
+## CD4c23
+x1<-ggscatter(SOMs_meta, 
+                  x = "immune_entropy", 
+                  y = "CD4c23",
+                  alpha = 0.2,
+                  add = "reg.line",  # Add regression line
+                  conf.int = TRUE,
+                  add.params = list(color = "grey20", fill = "lightblue"), # Customize reg. line
+)+  stat_cor(
+  show.legend = FALSE,
+  method = "spearman",
+  p.accuracy = 0.00000001,
+  r.accuracy = 0.01)+
+  xlab("immune entropy (1-r)")+
+  ylab("CD4c23 (%CD4+)")
+
+x2<-ggscatter(SOMs_meta, 
+                  x = "age", 
+                  y = "CD4c23",
+                  alpha = 0.2,
+                  add = "reg.line",  # Add regression line
+                  conf.int = TRUE,
+                  add.params = list(color = "grey20", fill = "lightblue"), # Customize reg. line
+)+  stat_cor(
+  show.legend = FALSE,
+  method = "spearman",
+  p.accuracy = 0.00000001,
+  r.accuracy = 0.01)+
+  xlab("age (years)")+
+  ylab("CD4c23 (%CD4+)")
+
+## CD8c26
+x3<-ggscatter(SOMs_meta, 
+                  x = "immune_entropy", 
+                  y = "CD8c26",
+                  alpha = 0.2,
+                  add = "reg.line",  # Add regression line
+                  conf.int = TRUE,
+                  add.params = list(color = "grey20", fill = "lightblue"), # Customize reg. line
+)+  stat_cor(
+  show.legend = FALSE,
+  method = "spearman",
+  p.accuracy = 0.00000001,
+  r.accuracy = 0.01)+
+  xlab("immune entropy (1-r)")+
+  ylab("CD8c26 (%CD8+)")
+
+x4<-ggscatter(SOMs_meta, 
+                  x = "age", 
+                  y = "CD8c26",
+                  alpha = 0.2,
+                  add = "reg.line",  # Add regression line
+                  conf.int = TRUE,
+                  add.params = list(color = "grey20", fill = "lightblue"), # Customize reg. line
+)+  stat_cor(
+  show.legend = FALSE,
+  method = "spearman",
+  p.accuracy = 0.00000001,
+  r.accuracy = 0.01)+
+  xlab("age (years)")+
+  ylab("CD8c26 (%CD8+)")
+
+
+## CD8c25
+x5<-ggscatter(SOMs_meta, 
+                  x = "immune_entropy", 
+                  y = "CD8c25",
+                  alpha = 0.2,
+                  add = "reg.line",  # Add regression line
+                  conf.int = TRUE,
+                  add.params = list(color = "grey20", fill = "lightblue"), # Customize reg. line
+)+  stat_cor(
+  show.legend = FALSE,
+  method = "spearman",
+  p.accuracy = 0.00000001,
+  r.accuracy = 0.01)+
+  xlab("immune entropy (1-r)")+
+  ylab("CD8c25 (%CD8+)")
+
+x6<-ggscatter(SOMs_meta, 
+                  x = "age", 
+                  y = "CD8c25",
+                  alpha = 0.2,
+                  add = "reg.line",  # Add regression line
+                  conf.int = TRUE,
+                  add.params = list(color = "grey20", fill = "lightblue"), # Customize reg. line
+)+  stat_cor(
+  show.legend = FALSE,
+  method = "spearman",
+  p.accuracy = 0.00000001,
+  r.accuracy = 0.01)+
+  xlab("age (years)")+
+  ylab("CD8c25 (%CD8+)")
+
+ggarrange(x1,x2,x3,x4,x5,x6, ncol = 2, nrow=3)
+ggsave(file = paste0(som_save.dir, "som_ageandentropy_linear.pdf"), width = 6, height = 8)
+```
+
+## CD4c23
+```{r}
+## CD4c23
+x1<-ggscatter(SOMs_meta, 
+                  x = "immune_entropy", 
+                  y = "CD4c23",
+                  alpha = 0.2,
+                  add = "reg.line",  # Add regression line
+                  conf.int = TRUE,
+                  add.params = list(color = "grey20", fill = "lightblue"), # Customize reg. line
+)+  stat_cor(
+  show.legend = FALSE,
+  method = "spearman",
+  p.accuracy = 0.00000001,
+  r.accuracy = 0.01)+
+  xlab("immune entropy (1-r)")+
+  ylab("CD4c23 (%CD4+)")
+
+x2<-ggscatter(SOMs_meta, 
+                  x = "age", 
+                  y = "CD4c23",
+                  alpha = 0.2,
+                  add = "reg.line",  # Add regression line
+                  conf.int = TRUE,
+                  add.params = list(color = "grey20", fill = "lightblue"), # Customize reg. line
+)+  stat_cor(
+  show.legend = FALSE,
+  method = "spearman",
+  p.accuracy = 0.00000001,
+  r.accuracy = 0.01)+
+  xlab("age (years)")+
+  ylab("CD4c23 (%CD4+)")
+
+ggarrange(x1,x2)
+ggsave(file = paste0(som_save.dir, "som_CD4c23_ageandentropy_linear.pdf"), width = 5, height = 2.5)
+```
+## CD8c26
+```{r}
+## CD8c23
+x1<-ggscatter(SOMs_meta, 
+                  x = "immune_entropy", 
+                  y = "CD8c26",
+                  alpha = 0.2,
+                  add = "reg.line",  # Add regression line
+                  conf.int = TRUE,
+                  add.params = list(color = "grey20", fill = "lightblue"), # Customize reg. line
+)+  stat_cor(
+  show.legend = FALSE,
+  method = "spearman",
+  p.accuracy = 0.00000001,
+  r.accuracy = 0.01)+
+  xlab("immune entropy (1-r)")+
+  ylab("CD8c26 (%CD8+)")
+
+x2<-ggscatter(SOMs_meta, 
+                  x = "age", 
+                  y = "CD8c26",
+                  alpha = 0.2,
+                  add = "reg.line",  # Add regression line
+                  conf.int = TRUE,
+                  add.params = list(color = "grey20", fill = "lightblue"), # Customize reg. line
+)+  stat_cor(
+  show.legend = FALSE,
+  method = "spearman",
+  p.accuracy = 0.00000001,
+  r.accuracy = 0.01)+
+  xlab("age (years)")+
+  ylab("CD8c26 (%CD8+)")
+
+ggarrange(x1,x2)
+ggsave(file = paste0(som_save.dir, "som_CD8c26_ageandentropy_linear.pdf"), width = 5, height = 2.5)
+```
+
+## CD31_CD8
+```{r}
+## CD31_CD8
+x7<-ggscatter(MFI_meta, 
+                  x = "immune_entropy", 
+                  y = "CD31_CD8",
+                  alpha = 0.2,
+                  add = "reg.line",  # Add regression line
+                  conf.int = TRUE,
+                  add.params = list(color = "grey20", fill = "lightblue"), # Customize reg. line
+)+  stat_cor(
+  show.legend = FALSE,
+  method = "spearman",
+  p.accuracy = 0.00000001,
+  r.accuracy = 0.01)+
+  xlab("immune entropy (1-r)")+
+  ylab("CD31 on CD8+ (MFI)")
+
+x8<-ggscatter(MFI_meta, 
+                  x = "age", 
+                  y = "CD31_CD8",
+                  alpha = 0.2,
+                  add = "reg.line",  # Add regression line
+                  conf.int = TRUE,
+                  add.params = list(color = "grey20", fill = "lightblue"), # Customize reg. line
+)+  stat_cor(
+  show.legend = FALSE,
+  method = "spearman",
+  p.accuracy = 0.00000001,
+  r.accuracy = 0.01)+
+  xlab("age (years)")+
+  ylab("CD31 on CD8+ (MFI)")
+
+ggarrange(x1,x2)
+ggsave(file = paste0(som_save.dir, "som_CD31_CD8_ageandentropy_linear.pdf"), width = 5, height = 2.5)
+```
+
+## CD31_CD4
+```{r}
+## CD31_CD4
+x9<-ggscatter(MFI_meta, 
+                  x = "immune_entropy", 
+                  y = "CD31_CD4",
+                  alpha = 0.2,
+                  add = "reg.line",  # Add regression line
+                  conf.int = TRUE,
+                  add.params = list(color = "grey20", fill = "lightblue"), # Customize reg. line
+)+  stat_cor(
+  show.legend = FALSE,
+  method = "spearman",
+  p.accuracy = 0.00000001,
+  r.accuracy = 0.01)+
+  xlab("immune entropy (1-r)")+
+  ylab("CD31 on CD4+ (MFI)")
+
+x10<-ggscatter(MFI_meta, 
+                  x = "age", 
+                  y = "CD31_CD4",
+                  alpha = 0.2,
+                  add = "reg.line",  # Add regression line
+                  conf.int = TRUE,
+                  add.params = list(color = "grey20", fill = "lightblue"), # Customize reg. line
+)+  stat_cor(
+  show.legend = FALSE,
+  method = "spearman",
+  p.accuracy = 0.00000001,
+  r.accuracy = 0.01)+
+  xlab("age (years)")+
+  ylab("CD31 on CD4+ (MFI)")
+
+ggarrange(x1,x2)
+ggsave(file = paste0(som_save.dir, "som_CD31_CD4_ageandentropy_linear.pdf"), width = 5, height = 2.5)
+```
+```{r}
+ggarrange(x1,x2,x3,x4,x5,x6,x7,x8, ncol = 4, nrow=2)
+ggsave(file = paste0(som_save.dir, "som_ageandentropy_all_linear.pdf"), width = 12, height = 6)
+```
+
+## CD31 of CD4+ Tn
+```{r}
+## CD4c23
+cor_df1 <- gating_meta
+
+names(cor_df1) <- gsub(x = names(cor_df1), pattern = "\\+", replacement = "p")
+names(cor_df1) <- gsub(x = names(cor_df1), pattern = "\\-", replacement = "n")
+
+x1<-ggscatter(cor_df1, 
+                  x = "immune_entropy", 
+                  y = "CD4_CD31p_TrueN_per",
+                  alpha = 0.2,
+                  add = "reg.line",  # Add regression line
+                  conf.int = TRUE,
+                  add.params = list(color = "grey20", fill = "lightblue"), # Customize reg. line
+)+  stat_cor(
+  show.legend = FALSE,
+  method = "spearman",
+  p.accuracy = 0.00000001,
+  r.accuracy = 0.01)+
+  xlab("immune entropy (1-r)")+
+  ylab("CD4_CD31p_TrueN_per")
+x1
+
+x2<-ggscatter(cor_df1, 
+                  x = "age", 
+                  y = "CD4_CD31p_TrueN_per",
+                  alpha = 0.2,
+                  add = "reg.line",  # Add regression line
+                  conf.int = TRUE,
+                  add.params = list(color = "grey20", fill = "lightblue"), # Customize reg. line
+)+  stat_cor(
+  show.legend = FALSE,
+  method = "spearman",
+  p.accuracy = 0.00000001,
+  r.accuracy = 0.01)+
+  ylab("CD4_CD31p_TrueN_per")
+x2
+
+ggarrange(x1,x2)
+ggsave(file = paste0(som_save.dir, "som_CD4_CD31p_TrueN_per_ageandentropy_linear.pdf"), width = 5, height = 2.5)
+```
+## CD31 of CD8+ Tn
+```{r}
+## CD4c23
+cor_df1 <- gating_meta
+
+names(cor_df1) <- gsub(x = names(cor_df1), pattern = "\\+", replacement = "p")
+names(cor_df1) <- gsub(x = names(cor_df1), pattern = "\\-", replacement = "n")
+
+x1<-ggscatter(cor_df1, 
+                  x = "immune_entropy", 
+                  y = "CD8_CD31p_TrueN_per",
+                  alpha = 0.2,
+                  add = "reg.line",  # Add regression line
+                  conf.int = TRUE,
+                  add.params = list(color = "grey20", fill = "lightblue"), # Customize reg. line
+)+  stat_cor(
+  show.legend = FALSE,
+  method = "spearman",
+  p.accuracy = 0.00000001,
+  r.accuracy = 0.01)+
+  xlab("immune entropy (1-r)")+
+  ylab("CD8_CD31p_TrueN_per")
+x1
+
+x2<-ggscatter(cor_df1, 
+                  x = "age", 
+                  y = "CD8_CD31p_TrueN_per",
+                  alpha = 0.2,
+                  add = "reg.line",  # Add regression line
+                  conf.int = TRUE,
+                  add.params = list(color = "grey20", fill = "lightblue"), # Customize reg. line
+)+  stat_cor(
+  show.legend = FALSE,
+  method = "spearman",
+  p.accuracy = 0.00000001,
+  r.accuracy = 0.01)+
+  ylab("CD8_CD31p_TrueN_per")
+x2
+
+ggarrange(x1,x2)
+ggsave(file = paste0(som_save.dir, "som_CD8_CD31p_TrueN_per_ageandentropy_linear.pdf"), width = 5, height = 2.5)
+```
