@@ -1,0 +1,234 @@
+---
+title: "Chapter_3_data_organization"
+author: "Alper"
+date: "2023-02-10"
+output: html_document
+---
+
+# library
+```{r message=FALSE, warning=FALSE, include=FALSE}
+analysis.path <- getwd()
+
+source("libraries_functions.R") #load the libraries
+```
+
+# import additional datasets, demographics, trucount, CMV, immunotype, cytokine
+## Import subject information, age, age group, sex
+```{r}
+## subset the age, age groups and sex data 
+vital_subject <- read_excel("/Users/alpercevirgel/Documents/Alper RIVM/1_Complete_analysis_per_project/VITAL database/VITAL database Alper.xlsx",
+                            sheet = "subject",
+                            skip = 1) %>% 
+  mutate_at(c("sex","Age_group_T0"), list(~factor(.))) %>%
+  mutate_at(c("subject_identifier"), list(~as.character(.))) %>%
+  dplyr::rename(age_group=Age_group_T0,
+                age=Age_T0,
+                BMI=BMI_T0) %>%
+  dplyr::select(subject_identifier,sex,age,age_group) %>%
+  as.data.frame()
+
+
+head(vital_subject) 
+```
+## Chronic viral infection data
+```{r}
+## add chronic herpes virus infection data, and create factors for CMV+/- & EBV+/- combinations
+chronic_viral_inf <- read_excel("/Users/alpercevirgel/Documents/Alper RIVM/1_Complete_analysis_per_project/VITAL database/VITAL database Alper.xlsx", 
+                                       sheet = "CMV_EBV_VZV",
+                                       skip = 1,na = "n/a") %>%
+  dplyr::select(subject_identifier,MIA_CMV_Titer,MIA_CMV_Seropositivity,MIA_EBV_Titer,MIA_EBV_Seropositivity,MIA_VZV_Titer,MIA_VZV_Seropositivity) %>%
+  mutate(CMV_EBV_combined = case_when(
+      MIA_CMV_Seropositivity == "1" & MIA_EBV_Seropositivity == "1"  ~ "CMV+EBV+",
+      MIA_CMV_Seropositivity == "2" & MIA_EBV_Seropositivity == "2"  ~ "CMV-EBV-",
+      MIA_CMV_Seropositivity == "3" | MIA_EBV_Seropositivity == "3"  ~ "Borderline",
+      MIA_CMV_Seropositivity == "1" & MIA_EBV_Seropositivity == "2"  ~ "CMV+EBV-",
+      MIA_CMV_Seropositivity == "2" & MIA_EBV_Seropositivity == "1"  ~ "CMV-EBV+",
+),.after="subject_identifier") %>%
+  mutate_at(c("subject_identifier"), list(~as.character(.))) %>%
+  mutate_at(c("MIA_CMV_Seropositivity","MIA_EBV_Seropositivity","MIA_VZV_Seropositivity","CMV_EBV_combined"), list(~factor(.))) %>%
+  mutate(MIA_CMV_Seropositivity = recode(MIA_CMV_Seropositivity,"3" = "2")) 
+
+head(chronic_viral_inf)
+```
+## Immunotype
+```{r}
+immunotype <- readRDS(
+  "/Users/alpercevirgel/Documents/Alper RIVM/4_Manuscripts/Chapter_1/R_analysis/vital.truc_influ_d0_cluster.rds") %>%
+  dplyr::select(subject_identifier,cluster_number)
+```
+## immune entropy and stability
+```{r}
+immune_entropy <- readRDS("~/Documents/Alper RIVM/4_Manuscripts/Chapter_4/R_analysis/immune_entropy_all_VITAL.rds") %>%
+  rename(immune_entropy = entropy_cor_T0T5num_med)
+immune_stability <- readRDS("~/Documents/Alper RIVM/4_Manuscripts/Chapter_4/R_analysis/immune_stability.rds") %>%
+  rename(immune_stability = stability_num)
+```
+
+## cytokine
+```{r}
+cytokine <- read_excel("~/Documents/Alper RIVM/1_Complete_analysis_per_project/VITAL database/VITAL database Alper.xlsx", 
+    sheet = "cytokines_final", skip = 1, na="NA") %>%
+  mutate_at(c("subject_identifier"), list(~as.character(.))) %>%
+  as.data.frame() %>%
+  drop_na()
+```
+
+# METADATA RADIANT, run only once. This is too create the metadata xlsx to be usd in RADIANT
+```{r eval=FALSE, include=FALSE}
+## CD4 example, done for CD8 and TCRgd too
+read_excel(
+  "/Users/alpercevirgel/Documents/Alper RIVM/4_Manuscripts/Chapter_3/R_analysis/RADIANT/CD4/RADIANT Catalyst CD4 metadata.xlsx") %>%
+  rename("subject_identifier"="sample_id") %>%
+  full_join(vital_subject, by="subject_identifier") %>%
+  full_join(immunotype, by="subject_identifier") %>%
+  full_join(chronic_viral_inf[c(1,4)], by="subject_identifier") %>%
+  full_join(immune_entropy, by="subject_identifier") %>%
+  full_join(immune_stability, by="subject_identifier") %>%
+  rename("sample_id"="subject_identifier") %>%
+  drop_na(file_name) %>%
+  write_xlsx("/Users/alpercevirgel/Documents/Alper RIVM/4_Manuscripts/Chapter_3/R_analysis/RADIANT/CD4/RADIANT Catalyst CD4 metadata.xlsx")
+
+```
+
+# flowSOM data, immune subset frequencies import
+```{r}
+fs_CD4 <- read_excel("/Users/alpercevirgel/Documents/Alper RIVM/4_Manuscripts/Chapter_3/R_analysis/RADIANT/CD4/03 Results/02 FlowSOM_clustering/01 Cluster merging of pqcd/freq_som_merging1.xlsx") %>%
+  dplyr::select(sample_id,cluster_id,Freq) %>% 
+  pivot_wider(names_from = cluster_id, values_from = Freq) %>%
+  rename(subject_identifier=sample_id)
+names(fs_CD4)<-gsub(x = names(fs_CD4), pattern = "C", replacement = "CD4c")
+
+fs_CD8 <- read_excel("/Users/alpercevirgel/Documents/Alper RIVM/4_Manuscripts/Chapter_3/R_analysis/RADIANT/CD8/03 Results/02 FlowSOM_clustering/01 Cluster merging of pqcd/freq_som_merging1.xlsx") %>%
+  dplyr::select(sample_id,cluster_id,Freq) %>% 
+  pivot_wider(names_from = cluster_id, values_from = Freq) %>%
+  rename(subject_identifier=sample_id)
+names(fs_CD8)<-gsub(x = names(fs_CD8), pattern = "C", replacement = "CD8c")
+
+fs_TCRgd <- read_excel("/Users/alpercevirgel/Documents/Alper RIVM/4_Manuscripts/Chapter_3/R_analysis/RADIANT/TCRgd/03 Results/02 FlowSOM_clustering/01 Cluster merging of pqcd/freq_som_merging1.xlsx") %>%
+  dplyr::select(sample_id,cluster_id,Freq) %>% 
+  pivot_wider(names_from = cluster_id, values_from = Freq) %>%
+  rename(subject_identifier=sample_id)
+names(fs_TCRgd)<-gsub(x = names(fs_TCRgd), pattern = "C", replacement = "GDc")
+
+
+SOMs <- fs_CD4 %>%
+  full_join(fs_CD8, by=c("subject_identifier")) %>%
+  full_join(fs_TCRgd, by=c("subject_identifier")) 
+```
+
+# marker expression median per sample
+```{r}
+temp_CD4 <- read_excel("/Users/alpercevirgel/Documents/Alper RIVM/4_Manuscripts/Chapter_3/R_analysis/RADIANT/CD4/00 RADIANT files/median_exprss_CD4.xlsx") %>%
+  select(-`...1`) %>% 
+  as.data.frame() %>%
+  mutate(.before=marker ,cell_type=c("CD4"))
+
+temp_CD8 <- read_excel("/Users/alpercevirgel/Documents/Alper RIVM/4_Manuscripts/Chapter_3/R_analysis/RADIANT/CD8/00 RADIANT files/median_exprss_CD8.xlsx") %>%
+  select(-`...1`) %>% 
+  as.data.frame() %>%
+  mutate(.before=marker ,cell_type=c("CD8"))
+
+temp_TCRgd <- read_excel("/Users/alpercevirgel/Documents/Alper RIVM/4_Manuscripts/Chapter_3/R_analysis/RADIANT/TCRgd/00 RADIANT files/median_exprss_TCRgd.xlsx") %>%
+  select(-`...1`) %>% 
+  as.data.frame() %>%
+  mutate(.before=marker ,cell_type=c("TCRgd"))
+
+MFI_celltype <- rbind(temp_CD4,temp_CD8,temp_TCRgd) %>% rename(subject_identifier=sample_id)
+
+exprss_MFI <- rbind(temp_CD4,temp_CD8,temp_TCRgd) %>%
+  rename(subject_identifier=sample_id)%>%
+  pivot_wider(
+              names_from = marker, 
+              values_from = median_expression) %>%
+  pivot_wider(
+    names_from = cell_type,
+    values_from = c(CCR4, CCR6, CCR7, CD127, CD159a, CD25, CD27, CD28, CD31, CD38, CD45RA, CD57,
+                    CD95, CTLA4, CX3CR1, CXCR3, CXCR5, FOXP3, HLADR, Helios, ICOS, KLGR1, PD1, 
+                    TIGIT, panKIR,CD4,CD8),
+    names_sep = "_"
+  ) %>% 
+  select(-c(CD4_CD4,CD4_CD8,CD8_CD8,CD8_CD4))%>%
+  as.data.frame()
+```
+
+# triple response quartiles
+```{r}
+trivac_resp_quartiles <- readRDS("/Users/alpercevirgel/Documents/Alper RIVM/4_Manuscripts/Chapter_4/R_analysis/trivac_resp_quartiles.rds") %>%
+  mutate(ResponseGroup_Triple2 = recode(ResponseGroup_Triple, "1" = "TQ12", "2" = "TQ12", "3"="TQ34", "4"="TQ34")) %>%
+  mutate(ResponseGroup_Triple = recode(ResponseGroup_Triple, "1" = "TQ1", "2" = "TQ2", "3"="TQ3", "4"="TQ4")) %>%
+  droplevels()
+```
+
+# Manual cell subsets (takes excel from flowjo & organizes for R)
+```{r echo=TRUE}
+manual_gates <- read_excel("~/Documents/Alper RIVM/1_Complete_analysis_per_project/VITAL Aurora/Analysis/Manual gating/manual_gating2.xls") %>%
+  rename("sample_identifier"="...1") %>%
+  as.data.frame() %>%
+  mutate_all(~str_remove_all(., " %")) %>%
+  mutate_all(~str_remove_all(., ".fcs")) %>%
+  filter(!str_detect(sample_identifier, "Mean")) %>%
+  filter(!str_detect(sample_identifier, "SD")) %>%
+  filter(!str_detect(sample_identifier, "control")) %>%
+  filter(!str_detect(sample_identifier, "rainbow")) %>%
+  filter(!str_detect(sample_identifier, "Bram")) %>%
+  mutate_at(vars(-sample_identifier), as.numeric)  %>%
+  separate(sample_identifier,
+           into = c("batch", "subject_identifier","timepoint"), sep = "_") %>%
+  mutate(sample_identifier = ifelse(nchar(subject_identifier) == 2,
+                                    paste0("0", subject_identifier), subject_identifier)) %>%
+  relocate(where(is.numeric), .after = last_col()) %>%
+  mutate(sample_identifier = paste0(sample_identifier, "C")) %>%
+  mutate(sample_identifier=ifelse(timepoint == "d0",
+                                  paste0("406A", sample_identifier),
+                                  paste0("406C", sample_identifier))) %>%
+  mutate(timepoint = dplyr::recode(timepoint,
+                                   "d0" = "A")) %>%
+  dplyr::select(subject_identifier, everything(.)) %>%
+  dplyr::select(-c(timepoint,batch,sample_identifier)) 
+```
+
+# metas
+```{r}
+IDs_sub_sam <- manual_gates %>% filter(subject_identifier %!in% c("c1","c2","c3","c4","c5")) %>% select(subject_identifier)
+
+
+SOMs_meta <- vital_subject %>%
+  full_join(immunotype, by="subject_identifier") %>%
+  full_join(chronic_viral_inf[c(1,4)], by="subject_identifier") %>%
+  full_join(immune_entropy, by="subject_identifier") %>%
+  full_join(immune_stability, by="subject_identifier") %>%
+  full_join(SOMs, by="subject_identifier")%>%
+  as.data.frame() %>%
+  left_join(trivac_resp_quartiles) %>%
+  drop_na(ResponseGroup_Triple2) %>%
+  dplyr::select(where(is.character), where(is.factor), where(is.numeric)) %>%
+  filter(subject_identifier %in% IDs_sub_sam$subject_identifier) 
+
+MFI_meta <- exprss_MFI %>%
+  full_join(vital_subject) %>%
+  full_join(immunotype)%>%
+  full_join(chronic_viral_inf[c(1,4)], by="subject_identifier") %>%
+  full_join(immune_entropy, by="subject_identifier") %>%
+  full_join(immune_stability, by="subject_identifier") %>%
+  full_join(trivac_resp_quartiles)  %>%
+  drop_na(ResponseGroup_Triple2) %>%
+  filter(subject_identifier %in% IDs_sub_sam$subject_identifier)
+
+gating_meta <- vital_subject %>%
+  full_join(immunotype, by="subject_identifier") %>%
+  full_join(chronic_viral_inf[c(1,4)], by="subject_identifier") %>%
+  full_join(immune_entropy, by="subject_identifier") %>%
+  full_join(immune_stability, by="subject_identifier") %>%
+  full_join(manual_gates, by="subject_identifier")%>%
+  as.data.frame() %>%
+  dplyr::select(where(is.character), where(is.factor), where(is.numeric)) %>%
+  drop_na(subject_identifier) %>%
+  left_join(trivac_resp_quartiles) %>%
+  drop_na(ResponseGroup_Triple2) %>%
+  filter(subject_identifier %in% IDs_sub_sam$subject_identifier)
+  
+
+trivac_resp_quartiles <- trivac_resp_quartiles %>% filter(subject_identifier %in% IDs_sub_sam$subject_identifier)
+```
+
+
