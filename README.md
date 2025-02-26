@@ -9,6 +9,7 @@ Alper Cevirgel1,2, Martijn Vos1, Elske Bijvank1, Josine van Beek1, Marieke van d
 *Corresponding author. Email: d[dot]van[dot]baarle[at]umcg[dot]nl
 
 For information related to codes and analysis: Alper Cevirgel; alpercevirgel[@]gmail[dot]com
+
 For information related to participants and related metadata: Debbie van Baarle; d[dot]van[dot]baarle[at]umcg[dot]nl Josine van Beek; josine[dot]van[dot]beek[at]rivm[dot]nl
 
 
